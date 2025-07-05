@@ -18,3 +18,8 @@ Complementary datasets and the baseline MATLAB CPU implementation are available 
 **This package includes:**
 - `.mat` cardiac cine MRI datasets
 - MATLAB code for the Modified L+S reconstruction
+
+## 📖 Citation
+
+If you use this code or dataset in your research, please cite the following article:
+> [https://doi.org/10.1007/s10334-023-01128-5](https://doi.org/10.1007/s10334-023-01128-5)
