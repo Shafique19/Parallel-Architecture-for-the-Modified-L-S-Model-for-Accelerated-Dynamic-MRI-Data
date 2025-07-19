@@ -1,65 +1,67 @@
 #include <Eigen/Dense>
 #include <iostream>
-#include <cmath>
 
 using namespace Eigen;
 using namespace std;
 
-// Function to compute economic SVD using eigendecomposition
-void eigSVD(const MatrixXd& A, MatrixXd& U, MatrixXd& S, MatrixXd& V) {
-    int n = A.cols();
+// Economic SVD using eigendecomposition
+void eigSVD(const auto& A, auto& U, auto& S, auto& V) {
+    auto B = A.transpose() * A;
 
-    // Compute A' * A (Gram matrix)
-    MatrixXd B = A.transpose() * A;
-
-    // Eigen-decomposition of B = V * D * V'
-    SelfAdjointEigenSolver<MatrixXd> eigensolver(B);
-    if (eigensolver.info() != Success) {
+    SelfAdjointEigenSolver<std::decay_t<decltype(B)>> eig(B);
+    if (eig.info() != Success) {
         cerr << "Eigen decomposition failed!" << endl;
         return;
     }
 
-    VectorXd d = eigensolver.eigenvalues();        // Eigenvalues
-    MatrixXd V_full = eigensolver.eigenvectors();  // Eigenvectors (columns)
+    auto d = eig.eigenvalues().array().abs().sqrt();
+    S = d.matrix().asDiagonal();
 
-    // Singular values = sqrt of eigenvalues
-    VectorXd e = d.array().abs().sqrt();           // e = sqrt(abs(d))
+    auto Vfull = eig.eigenvectors();
+    auto temp = A * Vfull;
 
-    // Create diagonal matrix S
-    S = e.asDiagonal();
-
-    // Compute U = A * V * S^{-1}
-    MatrixXd temp = A * V_full;
-    for (int i = 0; i < e.size(); ++i) {
-        if (e(i) > 1e-12) {  // Avoid divide by zero
-            temp.col(i) /= e(i);
+    for (Index i = 0; i < d.size(); ++i) {
+        if (d(i) > 1e-12) {
+            temp.col(i) /= d(i);
         } else {
             temp.col(i).setZero();
         }
     }
 
     U = temp;
-    V = V_full;
+    V = Vfull;
 }
 
+// Randomized SVD without explicitly stating matrix dimensions/types
+void randomizedSVD(const auto& A, int k, int p, auto& U, auto& S, auto& V) {
+    int l = k + p;
+    auto Omega = A.transpose() * MatrixXd::Random(A.cols(), l);
+    auto Y = A * Omega;
+
+    HouseholderQR qr(Y);
+    auto Q = qr.householderQ() * decltype(A)::Identity(A.rows(), l);
+
+    auto B = Q.transpose() * A;
+
+    decltype(A) U_tilde, S_tilde, V_tilde;
+    eigSVD(B, U_tilde, S_tilde, V_tilde);
+
+    U = Q * U_tilde;
+    S = S_tilde;
+    V = V_tilde;
+}
+
+// Usage example (with dynamic data)
 int main() {
-    // Example usage
-    MatrixXd A(4, 3);
-    A << 1, 0, 0,
-         0, 1, 0,
-         0, 0, 1,
-         0, 0, 0;
+    auto A = Eigen::MatrixXd::Random(5, 3);  // Replace with dynamic input
 
-    MatrixXd U, S, V;
-    eigSVD(A, U, S, V);
+    decltype(A) U, S, V;
+    int k = 2, p = 2;
 
-    cout << "U:\n" << U << endl;
-    cout << "S:\n" << S << endl;
-    cout << "V:\n" << V << endl;
+    randomizedSVD(A, k, p, U, S, V);
 
-    // Reconstruct A from U * S * V.transpose()
-    MatrixXd A_reconstructed = U * S * V.transpose();
-    cout << "Reconstructed A:\n" << A_reconstructed << endl;
+    cout << "U:\n" << U << "\nS:\n" << S << "\nV:\n" << V << endl;
+    cout << "Approx A:\n" << U * S * V.transpose() << endl;
 
     return 0;
 }
