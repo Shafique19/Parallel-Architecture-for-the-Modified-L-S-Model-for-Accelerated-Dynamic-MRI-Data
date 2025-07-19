@@ -1,0 +1,65 @@
+#include <Eigen/Dense>
+#include <iostream>
+#include <cmath>
+
+using namespace Eigen;
+using namespace std;
+
+// Function to compute economic SVD using eigendecomposition
+void eigSVD(const MatrixXd& A, MatrixXd& U, MatrixXd& S, MatrixXd& V) {
+    int n = A.cols();
+
+    // Compute A' * A (Gram matrix)
+    MatrixXd B = A.transpose() * A;
+
+    // Eigen-decomposition of B = V * D * V'
+    SelfAdjointEigenSolver<MatrixXd> eigensolver(B);
+    if (eigensolver.info() != Success) {
+        cerr << "Eigen decomposition failed!" << endl;
+        return;
+    }
+
+    VectorXd d = eigensolver.eigenvalues();        // Eigenvalues
+    MatrixXd V_full = eigensolver.eigenvectors();  // Eigenvectors (columns)
+
+    // Singular values = sqrt of eigenvalues
+    VectorXd e = d.array().abs().sqrt();           // e = sqrt(abs(d))
+
+    // Create diagonal matrix S
+    S = e.asDiagonal();
+
+    // Compute U = A * V * S^{-1}
+    MatrixXd temp = A * V_full;
+    for (int i = 0; i < e.size(); ++i) {
+        if (e(i) > 1e-12) {  // Avoid divide by zero
+            temp.col(i) /= e(i);
+        } else {
+            temp.col(i).setZero();
+        }
+    }
+
+    U = temp;
+    V = V_full;
+}
+
+int main() {
+    // Example usage
+    MatrixXd A(4, 3);
+    A << 1, 0, 0,
+         0, 1, 0,
+         0, 0, 1,
+         0, 0, 0;
+
+    MatrixXd U, S, V;
+    eigSVD(A, U, S, V);
+
+    cout << "U:\n" << U << endl;
+    cout << "S:\n" << S << endl;
+    cout << "V:\n" << V << endl;
+
+    // Reconstruct A from U * S * V.transpose()
+    MatrixXd A_reconstructed = U * S * V.transpose();
+    cout << "Reconstructed A:\n" << A_reconstructed << endl;
+
+    return 0;
+}
